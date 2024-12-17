@@ -5,7 +5,7 @@ import RegistrationForm from './RegistrationForm.jsx';
 import TimeTable from './TimeTable';
 import { exportToCSV } from './utils/export';
 import { applyFilters } from './utils/filters';
-import { excelService } from './services/excelService';
+import { excelService } from '../../services/excelService';
 
 const TimeRegistration = () => {
   // State management
@@ -56,6 +56,7 @@ const TimeRegistration = () => {
     setIsSubmitting(true);
     
     try {
+      console.log('Starting submission...');
       let updatedEntry;
       
       if (editingId) {
@@ -72,6 +73,11 @@ const TimeRegistration = () => {
           timestamp: new Date().toISOString()
         };
         setTimeEntries(prev => [...prev, updatedEntry]);
+
+        console.log('Attempting Excel registration...'); // Debug
+        const excelResult = await excelService.registerTime(updatedEntry);
+        console.log('Excel registration result:', excelResult); // Debug
+
       }
 
       // Registrer i Excel
