@@ -1,3 +1,21 @@
+import { PublicClientApplication } from '@azure/msal-browser';
+import { Client } from '@microsoft/microsoft-graph-client';
+
+
+// MSAL konfigurasjon
+const msalConfig = {
+  auth: {
+    clientId: '1a2b9279-6c23-4647-bad5-57f68cc5dd65', // Din Azure AD app registrering client ID
+    authority: 'https://login.microsoftonline.com/f8e66afc-b497-4de0-ab9e-d82ca2f21666', // Din tenant ID
+    redirectUri: window.location.origin,
+  },
+  cache: {
+    cacheLocation: 'sessionStorage',
+    storeAuthStateInCookie: false,
+  }
+};
+
+
 class ExcelService {
   constructor() {
     this.msalInstance = new PublicClientApplication(msalConfig);
