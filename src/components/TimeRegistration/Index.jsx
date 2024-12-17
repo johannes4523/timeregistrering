@@ -5,6 +5,7 @@ import RegistrationForm from './RegistrationForm.jsx';
 import TimeTable from './TimeTable';
 import { exportToCSV } from './utils/export';
 import { applyFilters } from './utils/filters';
+import { excelService } from './services/excelService';
 
 const TimeRegistration = () => {
   // State management
@@ -33,6 +34,8 @@ const TimeRegistration = () => {
     search: ''
   });
 
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   // Persist to localStorage
   useEffect(() => {
     localStorage.setItem('timeEntries', JSON.stringify(timeEntries));
@@ -48,39 +51,68 @@ const TimeRegistration = () => {
   };
 
   // Form handlers
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    setIsSubmitting(true);
     
-    if (editingId) {
-      setTimeEntries(prev => prev.map(entry => 
-        entry.id === editingId ? { ...currentEntry, id: editingId } : entry
-      ));
-      setEditingId(null);
-    } else {
-      const newEntry = {
-        ...currentEntry,
-        id: Date.now(),
-        timestamp: new Date().toISOString()
-      };
-      setTimeEntries(prev => [...prev, newEntry]);
-    }
-    
-    setCurrentEntry(prev => ({
-      date: new Date().toISOString().split('T')[0],
-      client: '',
-      project: '',
-      hours: '',
-      travelHours: '',
-      description: '',
-      consultant: prev.consultant
-    }));
+    try {
+      let updatedEntry;
+      
+      if (editingId) {
+        // Oppdater eksisterende registrering
+        updatedEntry = { ...currentEntry, id: editingId };
+        setTimeEntries(prev => prev.map(entry => 
+          entry.id === editingId ? updatedEntry : entry
+        ));
+      } else {
+        // Opprett ny registrering
+        updatedEntry = {
+          ...currentEntry,
+          id: Date.now(),
+          timestamp: new Date().toISOString()
+        };
+        setTimeEntries(prev => [...prev, updatedEntry]);
+      }
 
-    alert(editingId ? 'Timer oppdatert!' : 'Timer registrert!');
+      // Registrer i Excel
+      await excelService.registerTime(updatedEntry);
+      
+      // Reset skjema
+      setCurrentEntry({
+        date: new Date().toISOString().split('T')[0],
+        client: '',
+        project: '',
+        hours: '',
+        travelHours: '',
+        description: '',
+        consultant: currentEntry.consultant // Behold konsulent
+      });
+      
+      setEditingId(null);
+      alert(editingId ? 'Timer oppdatert i både systemet og Excel!' : 'Timer registrert i både systemet og Excel!');
+      
+    } catch (error) {
+      console.error('Feil ved registrering:', error);
+      alert(`Feil ved registrering: ${error.message}`);
+      
+      // Hvis Excel-oppdatering feiler, behold dataene i skjemaet
+      if (!editingId) {
+        setTimeEntries(prev => prev.filter(entry => entry.id !== currentEntry.id));
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  const handleDelete = (id) => {
+  const handleDelete = async (id) => {
     if (window.confirm('Er du sikker på at du vil slette denne timeregistreringen?')) {
-      setTimeEntries(prev => prev.filter(entry => entry.id !== id));
+      try {
+        // TODO: Implementer sletting fra Excel hvis ønskelig
+        setTimeEntries(prev => prev.filter(entry => entry.id !== id));
+      } catch (error) {
+        console.error('Feil ved sletting:', error);
+        alert(`Feil ved sletting: ${error.message}`);
+      }
     }
   };
 
@@ -125,6 +157,7 @@ const TimeRegistration = () => {
             editingId={editingId}
             cancelEdit={cancelEdit}
             clients={clients}
+            isSubmitting={isSubmitting}
           />
 
           <FilterPanel 
