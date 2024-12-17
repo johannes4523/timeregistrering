@@ -1,12 +1,11 @@
 import { PublicClientApplication } from '@azure/msal-browser';
 import { Client } from '@microsoft/microsoft-graph-client';
 
-
 // MSAL konfigurasjon
 const msalConfig = {
   auth: {
-    clientId: '1a2b9279-6c23-4647-bad5-57f68cc5dd65', // Din Azure AD app registrering client ID
-    authority: 'https://login.microsoftonline.com/f8e66afc-b497-4de0-ab9e-d82ca2f21666', // Din tenant ID
+    clientId: '1a2b9279-6c23-4647-bad5-57f68cc5dd65',
+    authority: 'https://login.microsoftonline.com/f8e66afc-b497-4de0-ab9e-d82ca2f21666',
     redirectUri: window.location.origin,
   },
   cache: {
@@ -15,90 +14,65 @@ const msalConfig = {
   }
 };
 
-
 class ExcelService {
   constructor() {
-    this.msalInstance = new PublicClientApplication(msalConfig);
+    this.msalInstance = null;
     this.graphClient = null;
-    this.isInitialized = false;
+  }
+
+  async initialize() {
+    if (!this.msalInstance) {
+      this.msalInstance = new PublicClientApplication(msalConfig);
+      await this.msalInstance.initialize();
+      
+      // Sjekk om vi har en eksisterende sesjon
+      const accounts = this.msalInstance.getAllAccounts();
+      if (accounts.length > 0) {
+        await this.initializeGraphClient(accounts[0]);
+      }
+    }
   }
 
   async login() {
     try {
-      console.log('Starting login process...');
-      const scopes = [
-        'Files.ReadWrite',
-        'Sites.ReadWrite.All',
-        'User.Read',
-        'Files.ReadWrite.All'
-      ];
+      // Sikre at MSAL er initialisert
+      await this.initialize();
 
-      // Sjekk om vi allerede har en aktiv sesjon
-      const accounts = this.msalInstance.getAllAccounts();
-      if (accounts.length > 0) {
-        console.log('Found existing account:', accounts[0].username);
-        await this.initializeGraphClient(accounts[0]);
-        return true;
-      }
+      const loginRequest = {
+        scopes: ['Files.ReadWrite', 'Sites.ReadWrite.All', 'User.Read']
+      };
 
-      console.log('No existing session, attempting login...');
-      const loginResponse = await this.msalInstance.loginPopup({ scopes });
-      console.log('Login response:', loginResponse);
-      
+      const loginResponse = await this.msalInstance.loginPopup(loginRequest);
+      console.log('Login successful', loginResponse);
       await this.initializeGraphClient(loginResponse.account);
-      this.isInitialized = true;
       return true;
     } catch (error) {
-      console.error('Detailed login error:', {
-        name: error.name,
-        message: error.message,
-        stack: error.stack
-      });
+      console.error('Login failed:', error);
       throw new Error(`Login failed: ${error.message}`);
     }
   }
 
   async initializeGraphClient(account) {
     try {
-      console.log('Initializing Graph client for account:', account.username);
-      
+      if (!this.msalInstance) {
+        await this.initialize();
+      }
+
       const tokenRequest = {
-        scopes: [
-          'Files.ReadWrite',
-          'Sites.ReadWrite.All',
-          'User.Read',
-          'Files.ReadWrite.All'
-        ],
+        scopes: ['Files.ReadWrite', 'Sites.ReadWrite.All', 'User.Read'],
         account: account
       };
 
-      console.log('Requesting token with:', tokenRequest);
       const token = await this.msalInstance.acquireTokenSilent(tokenRequest);
-      console.log('Token acquired successfully');
-
+      
       this.graphClient = Client.init({
         authProvider: (done) => {
           done(null, token.accessToken);
         }
       });
-
-      // Test Graph Client connection
-      try {
-        const testResponse = await this.graphClient.api('/me').get();
-        console.log('Graph client test successful:', testResponse.displayName);
-      } catch (graphError) {
-        console.error('Graph client test failed:', graphError);
-      }
-
     } catch (error) {
-      console.error('Graph client initialization error:', {
-        name: error.name,
-        message: error.message,
-        stack: error.stack
-      });
-      
+      console.error('Failed to initialize Graph client:', error);
       if (error.name === 'InteractionRequiredAuthError') {
-        console.log('Token expired, attempting re-login...');
         await this.login();
       } else {
         throw error;
@@ -108,26 +82,14 @@ class ExcelService {
 
   async registerTime(timeEntry) {
     try {
-      console.log('Starting time registration process...', timeEntry);
+      // Sikre at vi er initialisert og logget inn
+      await this.initialize();
 
-      // Sjekk autentisering
-      if (!this.graphClient || !this.isInitialized) {
-        console.log('No Graph client, attempting login...');
+      if (!this.graphClient) {
         await this.login();
       }
 
-      // Test SharePoint-tilgang
-      try {
-        console.log('Testing SharePoint access...');
-        const site = await this.graphClient
-          .api('/sites/valorino.sharepoint.com:/sites/ValoriCareAS')
-          .get();
-        console.log('SharePoint site access successful:', site.displayName);
-      } catch (siteError) {
-        console.error('SharePoint access test failed:', siteError);
-        throw new Error('Cannot access SharePoint site. Please check permissions.');
-      }
-
+      // Format data for Excel
       const rowData = [
         [
           timeEntry.date,
@@ -141,23 +103,17 @@ class ExcelService {
         ]
       ];
 
-      console.log('Formatted row data:', rowData);
-
-      // Opprett ny Excel-sesjon
-      console.log('Creating Excel session...');
+      // Get the next empty row
+      const nextRow = await this.findNextEmptyRow();
+      
+      // Construct the range address
+      const range = `Sheet1!A${nextRow}:H${nextRow}`;
+      
+      // Use the workbook sessions API for better reliability
       const session = await this.graphClient
         .api('/sites/valorino.sharepoint.com:/sites/ValoriCareAS:/drive/items/48E43E3E-77EF-4202-8A38-80BD9F773BAC/workbook/createSession')
         .post({});
-      console.log('Excel session created:', session.id);
-
-      // Finn neste ledige rad
-      const nextRow = await this.findNextEmptyRow(session.id);
-      console.log('Next empty row:', nextRow);
-
-      // Skriv data til Excel
-      const range = `Sheet1!A${nextRow}:H${nextRow}`;
-      console.log('Writing to range:', range);
-      
+        
       const response = await this.graphClient
         .api('/sites/valorino.sharepoint.com:/sites/ValoriCareAS:/drive/items/48E43E3E-77EF-4202-8A38-80BD9F773BAC/workbook/worksheets/Sheet1/range(address=\'' + range + '\')')
         .header('workbook-session-id', session.id)
@@ -165,36 +121,38 @@ class ExcelService {
           values: rowData
         });
 
-      console.log('Excel write response:', response);
-
-      // Lukk sesjonen
+      // Close the session
       await this.graphClient
         .api('/sites/valorino.sharepoint.com:/sites/ValoriCareAS:/drive/items/48E43E3E-77EF-4202-8A38-80BD9F773BAC/workbook/closeSession')
         .post({});
-      console.log('Excel session closed successfully');
 
+      console.log('Excel write successful:', response);
       return true;
 
     } catch (error) {
-      console.error('Detailed registration error:', {
-        name: error.name,
-        message: error.message,
-        stack: error.stack,
-        timeEntry: timeEntry
-      });
+      console.error('Error registering time in Excel:', error);
       throw new Error(`Excel registration failed: ${error.message}`);
     }
   }
 
-  async findNextEmptyRow(sessionId) {
+  async findNextEmptyRow() {
     try {
-      console.log('Finding next empty row...');
+      if (!this.graphClient) {
+        await this.login();
+      }
+
+      const session = await this.graphClient
+        .api('/sites/valorino.sharepoint.com:/sites/ValoriCareAS:/drive/items/48E43E3E-77EF-4202-8A38-80BD9F773BAC/workbook/createSession')
+        .post({});
+
       const response = await this.graphClient
         .api('/sites/valorino.sharepoint.com:/sites/ValoriCareAS:/drive/items/48E43E3E-77EF-4202-8A38-80BD9F773BAC/workbook/worksheets/Sheet1/usedRange')
-        .header('workbook-session-id', sessionId)
+        .header('workbook-session-id', session.id)
         .get();
 
-      console.log('Used range response:', response);
+      await this.graphClient
+        .api('/sites/valorino.sharepoint.com:/sites/ValoriCareAS:/drive/items/48E43E3E-77EF-4202-8A38-80BD9F773BAC/workbook/closeSession')
+        .post({});
 
       if (!response || typeof response.rowCount !== 'number') {
         console.warn('Invalid response from usedRange:', response);
