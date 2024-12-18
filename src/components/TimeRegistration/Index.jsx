@@ -43,7 +43,14 @@ const TimeRegistration = () => {
   const fetchTimeEntries = async () => {
     try {
       const data = await timeRegistrationService.getAllEntries();
-      setTimeEntries(data);
+
+      // Mapper travel_hours til travelHours for frontend
+      const mappedData = data.map(entry => ({
+        ...entry,
+        travelHours: entry.travel_hours, // Mapper til frontend-format
+      }));
+
+      setTimeEntries(mappedData);
     } catch (error) {
       console.error('Error fetching time entries:', error);
       alert('Kunne ikke hente timeregistreringer');
@@ -58,7 +65,7 @@ const TimeRegistration = () => {
     'Valori - KMD': [],
     'Valori - Youwell': [],
     'Valori - EHiN': [],
-    'Valori Care': ['Funding', 'Markedsføring SoMe', 'Produktutvikling', 'Administrasjon', 'Annet'],
+    'Valori Care': ['Funding', 'Markedsføring SoMe', 'Produktutvikling', 'Administrasjon', 'Annet', 'Forskningsmidler'],
   };
 
   // Navn på konsulenter

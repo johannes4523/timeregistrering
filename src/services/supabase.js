@@ -31,7 +31,7 @@ export const timeRegistrationService = {
         client: entry.client,
         project: entry.project,
         hours: entry.hours,
-        travel_hours: entry.travelHours,
+        travel_hours: entry.travel_hours,
         description: entry.description,
         consultant: entry.consultant,
         timestamp: new Date().toISOString()
