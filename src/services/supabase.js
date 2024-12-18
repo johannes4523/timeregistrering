@@ -31,7 +31,7 @@ export const timeRegistrationService = {
         client: entry.client,
         project: entry.project,
         hours: entry.hours,
-        travel_hours: entry.travel_hours,
+        travel_hours: entry.travelHours,
         description: entry.description,
         consultant: entry.consultant,
         timestamp: new Date().toISOString()
@@ -39,8 +39,8 @@ export const timeRegistrationService = {
       .select()
     
     if (error) throw error
-    return data[0]
-  },
+    return data[0] ? { ...data[0], travelHours: data[0].travel_hours } : null;
+},
 
   async updateEntry(id, entry) {
     const { data, error } = await supabase
