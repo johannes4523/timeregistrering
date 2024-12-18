@@ -5,7 +5,7 @@ import RegistrationForm from './RegistrationForm';
 import TimeTable from './TimeTable';
 import { exportToCSV } from './utils/export';
 import { applyFilters } from './utils/filters';
-import { supabase } from '../../services/supabase';
+import { timeRegistrationService } from '../../services/supabase';
 
 const TimeRegistration = () => {
   // State management
@@ -34,20 +34,15 @@ const TimeRegistration = () => {
 
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Load data from Supabase when component mounts
+  // Last inn data når komponenten monteres
   useEffect(() => {
     fetchTimeEntries();
   }, []);
 
-  // Fetch data from Supabase
+  // Hent data fra service
   const fetchTimeEntries = async () => {
     try {
-      const { data, error } = await supabase
-        .from('time_entries')
-        .select('*')
-        .order('date', { ascending: false });
-
-      if (error) throw error;
+      const data = await timeRegistrationService.getAllEntries();
       setTimeEntries(data);
     } catch (error) {
       console.error('Error fetching time entries:', error);
@@ -75,46 +70,14 @@ const TimeRegistration = () => {
       let result;
       
       if (editingId) {
-        // Update existing registration
-        const { data, error } = await supabase
-          .from('time_entries')
-          .update({
-            date: currentEntry.date,
-            client: currentEntry.client,
-            project: currentEntry.project,
-            hours: currentEntry.hours,
-            travel_hours: currentEntry.travelHours,
-            description: currentEntry.description,
-            consultant: currentEntry.consultant
-          })
-          .eq('id', editingId)
-          .select();
-
-        if (error) throw error;
-        result = data[0];
-        
+        // Oppdater eksisterende registrering
+        result = await timeRegistrationService.updateEntry(editingId, currentEntry);
         setTimeEntries(prev => prev.map(entry => 
           entry.id === editingId ? result : entry
         ));
       } else {
-        // Create new registration
-        const { data, error } = await supabase
-          .from('time_entries')
-          .insert([{
-            date: currentEntry.date,
-            client: currentEntry.client,
-            project: currentEntry.project,
-            hours: currentEntry.hours,
-            travel_hours: currentEntry.travelHours,
-            description: currentEntry.description,
-            consultant: currentEntry.consultant,
-            timestamp: new Date().toISOString()
-          }])
-          .select();
-
-        if (error) throw error;
-        result = data[0];
-        
+        // Opprett ny registrering
+        result = await timeRegistrationService.addEntry(currentEntry);
         setTimeEntries(prev => [...prev, result]);
       }
 
@@ -143,13 +106,7 @@ const TimeRegistration = () => {
   const handleDelete = async (id) => {
     if (window.confirm('Er du sikker på at du vil slette denne timeregistreringen?')) {
       try {
-        const { error } = await supabase
-          .from('time_entries')
-          .delete()
-          .eq('id', id);
-
-        if (error) throw error;
-        
+        await timeRegistrationService.deleteEntry(id);
         setTimeEntries(prev => prev.filter(entry => entry.id !== id));
         alert('Timeregistrering slettet');
       } catch (error) {

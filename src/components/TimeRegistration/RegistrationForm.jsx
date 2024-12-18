@@ -1,245 +1,164 @@
-import { useState, useEffect, Fragment } from 'react';
-import FilterPanel from './FilterPanel';
-import StatisticsPanel from './StatisticsPanel';
-import RegistrationForm from './RegistrationForm';
-import TimeTable from './TimeTable';
-import { exportToCSV } from './utils/export';
-import { applyFilters } from './utils/filters';
-import { excelService } from '../../services/excelService';
+import React from 'react';
 
-const TimeRegistration = () => {
-  // State management
-  const [timeEntries, setTimeEntries] = useState(() => {
-    const savedEntries = localStorage.getItem('timeEntries');
-    return savedEntries ? JSON.parse(savedEntries) : [];
-  });
 
-  const [currentEntry, setCurrentEntry] = useState({
-    date: new Date().toISOString().split('T')[0],
-    client: '',
-    project: '',
-    hours: '',
-    travelHours: '',
-    description: '',
-    consultant: ''
-  });
 
-  const [editingId, setEditingId] = useState(null);
-  const [filters, setFilters] = useState({
-    dateFrom: '',
-    dateTo: '',
-    client: '',
-    consultant: '',
-    project: '',
-    search: ''
-  });
-
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isInitialized, setIsInitialized] = useState(false);
-  const [initError, setInitError] = useState(null);
-
-  // Initialize Excel service when component mounts
-  useEffect(() => {
-    const initializeExcelService = async () => {
-      try {
-        await excelService.initialize();
-        setIsInitialized(true);
-        setInitError(null);
-      } catch (error) {
-        console.error('Failed to initialize Excel service:', error);
-        setInitError(error.message);
-      }
-    };
-
-    initializeExcelService();
-  }, []);
-
-  // Persist to localStorage
-  useEffect(() => {
-    localStorage.setItem('timeEntries', JSON.stringify(timeEntries));
-  }, [timeEntries]);
-
-  // Client configuration
-  const clients = {
-    'Valori - DigiRehab': [],
-    'Valori - KMD': [],
-    'Valori - Youwell': [],
-    'Valori Care': ['Funding', 'Markedsføring SoMe', 'Produktutvikling', 'Administrasjon', 'Annet'],
-    'Valori - EHiN': [],
+const RegistrationForm = ({
+  currentEntry,
+  setCurrentEntry,
+  handleSubmit,
+  editingId,
+  cancelEdit,
+  clients,
+  isSubmitting
+}) => {
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setCurrentEntry(prev => ({
+      ...prev,
+      [name]: value
+    }));
   };
-
-  // Form handlers
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    
-    if (!isInitialized) {
-      alert('Excel service is not initialized. Please refresh the page and try again.');
-      return;
-    }
-
-    setIsSubmitting(true);
-    
-    try {
-      let updatedEntry;
-      
-      if (editingId) {
-        updatedEntry = { ...currentEntry, id: editingId };
-        setTimeEntries(prev => prev.map(entry => 
-          entry.id === editingId ? updatedEntry : entry
-        ));
-      } else {
-        updatedEntry = {
-          ...currentEntry,
-          id: Date.now(),
-          timestamp: new Date().toISOString()
-        };
-        setTimeEntries(prev => [...prev, updatedEntry]);
-      }
-
-      // Register in Excel only for new entries
-      if (!editingId) {
-        const excelResult = await excelService.registerTime(updatedEntry);
-        console.log('Excel registration result:', excelResult);
-      }
-      
-      // Reset form
-      setCurrentEntry({
-        date: new Date().toISOString().split('T')[0],
-        client: '',
-        project: '',
-        hours: '',
-        travelHours: '',
-        description: '',
-        consultant: currentEntry.consultant // Keep consultant
-      });
-      
-      setEditingId(null);
-      alert(editingId ? 'Timer oppdatert!' : 'Timer registrert i både systemet og Excel!');
-      
-    } catch (error) {
-      console.error('Feil ved registrering:', error);
-      alert(`Feil ved registrering: ${error.message}`);
-      
-      // If Excel update fails, remove the entry from local state
-      if (!editingId) {
-        setTimeEntries(prev => prev.filter(entry => entry.id !== currentEntry.id));
-      }
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const handleDelete = (id) => {
-    if (window.confirm('Er du sikker på at du vil slette denne timeregistreringen?')) {
-      try {
-        setTimeEntries(prev => prev.filter(entry => entry.id !== id));
-      } catch (error) {
-        console.error('Feil ved sletting:', error);
-        alert(`Feil ved sletting: ${error.message}`);
-      }
-    }
-  };
-
-  const handleEdit = (entry) => {
-    setCurrentEntry({
-      date: entry.date,
-      client: entry.client,
-      project: entry.project || '',
-      hours: entry.hours,
-      travelHours: entry.travelHours || '',
-      description: entry.description,
-      consultant: entry.consultant
-    });
-    setEditingId(entry.id);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
-
-  const cancelEdit = () => {
-    setEditingId(null);
-    setCurrentEntry({
-      date: new Date().toISOString().split('T')[0],
-      client: '',
-      project: '',
-      hours: '',
-      travelHours: '',
-      description: '',
-      consultant: currentEntry.consultant
-    });
-  };
-
-  // Filter entries
-  const filteredEntries = applyFilters(timeEntries, filters);
-
-  if (initError) {
-    return (
-      <div className="container mx-auto p-4">
-        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative">
-          <strong className="font-bold">Error: </strong>
-          <span className="block sm:inline">Failed to initialize Excel service. Please refresh the page or contact support.</span>
-          <p className="mt-2">{initError}</p>
-        </div>
-      </div>
-    );
-  }
 
   return (
-    <Fragment>
-      <div className="container mx-auto p-4">
-        <div className="space-y-6">
-          {!isInitialized && (
-            <div className="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded relative">
-              Initializing Excel service...
-            </div>
-          )}
-
-          <RegistrationForm 
-            currentEntry={currentEntry}
-            setCurrentEntry={setCurrentEntry}
-            handleSubmit={handleSubmit}
-            editingId={editingId}
-            cancelEdit={cancelEdit}
-            clients={clients}
-            isSubmitting={isSubmitting}
-            isInitialized={isInitialized}
+    <form onSubmit={handleSubmit} className="bg-white rounded-lg shadow-lg p-6">
+      <h2 className="text-2xl font-bold mb-6">
+        {editingId ? 'Rediger Timeregistrering' : 'Ny Timeregistrering'}
+      </h2>
+      
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Dato
+          </label>
+          <input
+            type="date"
+            name="date"
+            value={currentEntry.date}
+            onChange={handleInputChange}
+            required
+            className="w-full p-2 border rounded focus:ring-blue-500 focus:border-blue-500"
           />
+        </div>
 
-          <FilterPanel 
-            entries={timeEntries}
-            filters={filters}
-            setFilters={setFilters}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Konsulent
+          </label>
+          <input
+            type="text"
+            name="consultant"
+            value={currentEntry.consultant}
+            onChange={handleInputChange}
+            required
+            className="w-full p-2 border rounded focus:ring-blue-500 focus:border-blue-500"
           />
+        </div>
 
-          <StatisticsPanel entries={filteredEntries} />
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Kunde
+          </label>
+          <select
+            name="client"
+            value={currentEntry.client}
+            onChange={handleInputChange}
+            required
+            className="w-full p-2 border rounded focus:ring-blue-500 focus:border-blue-500"
+          >
+            <option value="">Velg kunde</option>
+            {Object.keys(clients).map(client => (
+              <option key={client} value={client}>
+                {client}
+              </option>
+            ))}
+          </select>
+        </div>
 
-          <div className="bg-white rounded-lg shadow-lg p-6">
-            <div className="flex justify-between items-center mb-4">
-              <div className="flex items-center space-x-4">
-                <h2 className="text-2xl font-bold">Registrerte Timer</h2>
-                <button
-                  onClick={() => exportToCSV(filteredEntries, filters)}
-                  className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 transition-colors"
-                >
-                  Eksporter Timer
-                </button>
-              </div>
-              <div className="text-gray-600">
-                Viser {filteredEntries.length} av {timeEntries.length} registreringer
-              </div>
-            </div>
-            
-            <div className="overflow-x-auto">
-              <TimeTable 
-                entries={filteredEntries}
-                editingId={editingId}
-                onEdit={handleEdit}
-                onDelete={handleDelete}
-              />
-            </div>
-          </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Prosjekt
+          </label>
+          <select
+            name="project"
+            value={currentEntry.project}
+            onChange={handleInputChange}
+            className="w-full p-2 border rounded focus:ring-blue-500 focus:border-blue-500"
+          >
+            <option value="">Velg prosjekt</option>
+            {currentEntry.client && clients[currentEntry.client]?.map(project => (
+              <option key={project} value={project}>
+                {project}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Timer
+          </label>
+          <input
+            type="number"
+            name="hours"
+            value={currentEntry.hours}
+            onChange={handleInputChange}
+            required
+            step="0.25"
+            min="0"
+            className="w-full p-2 border rounded focus:ring-blue-500 focus:border-blue-500"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Reisetimer
+          </label>
+          <input
+            type="number"
+            name="travelHours"
+            value={currentEntry.travelHours}
+            onChange={handleInputChange}
+            step="0.25"
+            min="0"
+            className="w-full p-2 border rounded focus:ring-blue-500 focus:border-blue-500"
+          />
         </div>
       </div>
-    </Fragment>
+
+      <div className="mb-4">
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          Beskrivelse
+        </label>
+        <textarea
+          name="description"
+          value={currentEntry.description}
+          onChange={handleInputChange}
+          required
+          rows="3"
+          className="w-full p-2 border rounded focus:ring-blue-500 focus:border-blue-500"
+        />
+      </div>
+
+      <div className="flex justify-end space-x-2">
+        {editingId && (
+          <button
+            type="button"
+            onClick={cancelEdit}
+            className="px-4 py-2 text-gray-700 border border-gray-300 rounded hover:bg-gray-50"
+          >
+            Avbryt
+          </button>
+        )}
+        <button
+          type="submit"
+          disabled={isSubmitting}
+          className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+        >
+          {isSubmitting ? 'Lagrer...' : editingId ? 'Oppdater' : 'Registrer'}
+        </button>
+      </div>
+    </form>
   );
 };
 
-export default TimeRegistration;
+export default RegistrationForm;
