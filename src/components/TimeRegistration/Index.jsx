@@ -1,18 +1,16 @@
 import { useState, useEffect, Fragment } from 'react';
 import FilterPanel from './FilterPanel';
 import StatisticsPanel from './StatisticsPanel';
-import RegistrationForm from './RegistrationForm.jsx';
+import RegistrationForm from './RegistrationForm';
 import TimeTable from './TimeTable';
 import { exportToCSV } from './utils/export';
 import { applyFilters } from './utils/filters';
-import { excelService } from '../../services/excelService';
+import { supabase } from '../../services/supabase';
 
 const TimeRegistration = () => {
   // State management
-  const [timeEntries, setTimeEntries] = useState(() => {
-    const savedEntries = localStorage.getItem('timeEntries');
-    return savedEntries ? JSON.parse(savedEntries) : [];
-  });
+  const [timeEntries, setTimeEntries] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   const [currentEntry, setCurrentEntry] = useState({
     date: new Date().toISOString().split('T')[0],
@@ -36,18 +34,36 @@ const TimeRegistration = () => {
 
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Persist to localStorage
+  // Load data from Supabase when component mounts
   useEffect(() => {
-    localStorage.setItem('timeEntries', JSON.stringify(timeEntries));
-  }, [timeEntries]);
+    fetchTimeEntries();
+  }, []);
+
+  // Fetch data from Supabase
+  const fetchTimeEntries = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('time_entries')
+        .select('*')
+        .order('date', { ascending: false });
+
+      if (error) throw error;
+      setTimeEntries(data);
+    } catch (error) {
+      console.error('Error fetching time entries:', error);
+      alert('Kunne ikke hente timeregistreringer');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   // Client configuration
   const clients = {
     'Valori - DigiRehab': [],
     'Valori - KMD': [],
     'Valori - Youwell': [],
-    'Valori Care': ['Funding', 'Markedsføring SoMe', 'Produktutvikling', 'Administrasjon', 'Annet'],
     'Valori - EHiN': [],
+    'Valori Care': ['Funding', 'Markedsføring SoMe', 'Produktutvikling', 'Administrasjon', 'Annet'],
   };
 
   // Form handlers
@@ -56,34 +72,53 @@ const TimeRegistration = () => {
     setIsSubmitting(true);
     
     try {
-      console.log('Starting submission...');
-      let updatedEntry;
+      let result;
       
       if (editingId) {
-        // Oppdater eksisterende registrering
-        updatedEntry = { ...currentEntry, id: editingId };
+        // Update existing registration
+        const { data, error } = await supabase
+          .from('time_entries')
+          .update({
+            date: currentEntry.date,
+            client: currentEntry.client,
+            project: currentEntry.project,
+            hours: currentEntry.hours,
+            travel_hours: currentEntry.travelHours,
+            description: currentEntry.description,
+            consultant: currentEntry.consultant
+          })
+          .eq('id', editingId)
+          .select();
+
+        if (error) throw error;
+        result = data[0];
+        
         setTimeEntries(prev => prev.map(entry => 
-          entry.id === editingId ? updatedEntry : entry
+          entry.id === editingId ? result : entry
         ));
       } else {
-        // Opprett ny registrering
-        updatedEntry = {
-          ...currentEntry,
-          id: Date.now(),
-          timestamp: new Date().toISOString()
-        };
-        setTimeEntries(prev => [...prev, updatedEntry]);
+        // Create new registration
+        const { data, error } = await supabase
+          .from('time_entries')
+          .insert([{
+            date: currentEntry.date,
+            client: currentEntry.client,
+            project: currentEntry.project,
+            hours: currentEntry.hours,
+            travel_hours: currentEntry.travelHours,
+            description: currentEntry.description,
+            consultant: currentEntry.consultant,
+            timestamp: new Date().toISOString()
+          }])
+          .select();
 
-        console.log('Attempting Excel registration...'); // Debug
-        const excelResult = await excelService.registerTime(updatedEntry);
-        console.log('Excel registration result:', excelResult); // Debug
-
+        if (error) throw error;
+        result = data[0];
+        
+        setTimeEntries(prev => [...prev, result]);
       }
 
-      // Registrer i Excel
-      await excelService.registerTime(updatedEntry);
-      
-      // Reset skjema
+      // Reset form
       setCurrentEntry({
         date: new Date().toISOString().split('T')[0],
         client: '',
@@ -91,20 +126,15 @@ const TimeRegistration = () => {
         hours: '',
         travelHours: '',
         description: '',
-        consultant: currentEntry.consultant // Behold konsulent
+        consultant: currentEntry.consultant // Keep consultant
       });
       
       setEditingId(null);
-      alert(editingId ? 'Timer oppdatert i både systemet og Excel!' : 'Timer registrert i både systemet og Excel!');
+      alert(editingId ? 'Timer oppdatert!' : 'Timer registrert!');
       
     } catch (error) {
       console.error('Feil ved registrering:', error);
       alert(`Feil ved registrering: ${error.message}`);
-      
-      // Hvis Excel-oppdatering feiler, behold dataene i skjemaet
-      if (!editingId) {
-        setTimeEntries(prev => prev.filter(entry => entry.id !== currentEntry.id));
-      }
     } finally {
       setIsSubmitting(false);
     }
@@ -113,8 +143,15 @@ const TimeRegistration = () => {
   const handleDelete = async (id) => {
     if (window.confirm('Er du sikker på at du vil slette denne timeregistreringen?')) {
       try {
-        // TODO: Implementer sletting fra Excel hvis ønskelig
+        const { error } = await supabase
+          .from('time_entries')
+          .delete()
+          .eq('id', id);
+
+        if (error) throw error;
+        
         setTimeEntries(prev => prev.filter(entry => entry.id !== id));
+        alert('Timeregistrering slettet');
       } catch (error) {
         console.error('Feil ved sletting:', error);
         alert(`Feil ved sletting: ${error.message}`);
@@ -128,7 +165,7 @@ const TimeRegistration = () => {
       client: entry.client,
       project: entry.project || '',
       hours: entry.hours,
-      travelHours: entry.travelHours || '',
+      travelHours: entry.travel_hours || '',
       description: entry.description,
       consultant: entry.consultant
     });
@@ -151,6 +188,10 @@ const TimeRegistration = () => {
 
   // Filter entries
   const filteredEntries = applyFilters(timeEntries, filters);
+
+  if (isLoading) {
+    return <div className="container mx-auto p-4">Laster timeregistreringer...</div>;
+  }
 
   return (
     <Fragment>
