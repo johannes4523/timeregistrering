@@ -36,15 +36,18 @@ const TimeRegistration = () => {
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
+  const [initError, setInitError] = useState(null);
 
-  // Initialiser Excel service når komponenten lastes
+  // Initialize Excel service when component mounts
   useEffect(() => {
     const initializeExcelService = async () => {
       try {
         await excelService.initialize();
         setIsInitialized(true);
+        setInitError(null);
       } catch (error) {
         console.error('Failed to initialize Excel service:', error);
+        setInitError(error.message);
       }
     };
 
@@ -68,17 +71,15 @@ const TimeRegistration = () => {
   // Form handlers
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    if (!isInitialized) {
+      alert('Excel service is not initialized. Please refresh the page and try again.');
+      return;
+    }
+
     setIsSubmitting(true);
     
     try {
-      console.log('Starting submission...');
-      
-      // Sikre at Excel service er initialisert
-      if (!isInitialized) {
-        await excelService.initialize();
-        setIsInitialized(true);
-      }
-
       let updatedEntry;
       
       if (editingId) {
@@ -95,12 +96,13 @@ const TimeRegistration = () => {
         setTimeEntries(prev => [...prev, updatedEntry]);
       }
 
-      // Registrer i Excel
-      console.log('Attempting Excel registration...');
-      const excelResult = await excelService.registerTime(updatedEntry);
-      console.log('Excel registration result:', excelResult);
+      // Register in Excel only for new entries
+      if (!editingId) {
+        const excelResult = await excelService.registerTime(updatedEntry);
+        console.log('Excel registration result:', excelResult);
+      }
       
-      // Reset skjema
+      // Reset form
       setCurrentEntry({
         date: new Date().toISOString().split('T')[0],
         client: '',
@@ -108,17 +110,17 @@ const TimeRegistration = () => {
         hours: '',
         travelHours: '',
         description: '',
-        consultant: currentEntry.consultant // Behold konsulent
+        consultant: currentEntry.consultant // Keep consultant
       });
       
       setEditingId(null);
-      alert(editingId ? 'Timer oppdatert i både systemet og Excel!' : 'Timer registrert i både systemet og Excel!');
+      alert(editingId ? 'Timer oppdatert!' : 'Timer registrert i både systemet og Excel!');
       
     } catch (error) {
       console.error('Feil ved registrering:', error);
       alert(`Feil ved registrering: ${error.message}`);
       
-      // Hvis Excel-oppdatering feiler, behold dataene i skjemaet
+      // If Excel update fails, remove the entry from local state
       if (!editingId) {
         setTimeEntries(prev => prev.filter(entry => entry.id !== currentEntry.id));
       }
@@ -127,8 +129,7 @@ const TimeRegistration = () => {
     }
   };
 
-  // Rest of the component remains the same...
-  const handleDelete = async (id) => {
+  const handleDelete = (id) => {
     if (window.confirm('Er du sikker på at du vil slette denne timeregistreringen?')) {
       try {
         setTimeEntries(prev => prev.filter(entry => entry.id !== id));
@@ -169,10 +170,28 @@ const TimeRegistration = () => {
   // Filter entries
   const filteredEntries = applyFilters(timeEntries, filters);
 
+  if (initError) {
+    return (
+      <div className="container mx-auto p-4">
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative">
+          <strong className="font-bold">Error: </strong>
+          <span className="block sm:inline">Failed to initialize Excel service. Please refresh the page or contact support.</span>
+          <p className="mt-2">{initError}</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <Fragment>
       <div className="container mx-auto p-4">
         <div className="space-y-6">
+          {!isInitialized && (
+            <div className="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded relative">
+              Initializing Excel service...
+            </div>
+          )}
+
           <RegistrationForm 
             currentEntry={currentEntry}
             setCurrentEntry={setCurrentEntry}
@@ -181,6 +200,7 @@ const TimeRegistration = () => {
             cancelEdit={cancelEdit}
             clients={clients}
             isSubmitting={isSubmitting}
+            isInitialized={isInitialized}
           />
 
           <FilterPanel 
