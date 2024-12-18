@@ -5,7 +5,7 @@ import RegistrationForm from './RegistrationForm';
 import TimeTable from './TimeTable';
 import { exportToCSV } from './utils/export';
 import { applyFilters } from './utils/filters';
-import { timeRegistrationService } from '../../services/supabase';
+import { supabase, timeRegistrationService } from '../../services/supabase';
 
 const TimeRegistration = () => {
   // State management
@@ -61,6 +61,10 @@ const TimeRegistration = () => {
     'Valori Care': ['Funding', 'Markedsføring SoMe', 'Produktutvikling', 'Administrasjon', 'Annet'],
   };
 
+  // Navn på konsulenter
+  const consultants = ['Hanne', 'Kathrine', 'Johannes'];
+
+
   // Form handlers
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -89,7 +93,7 @@ const TimeRegistration = () => {
         hours: '',
         travelHours: '',
         description: '',
-        consultant: currentEntry.consultant // Keep consultant
+        consultant: '' // Keep consultant
       });
       
       setEditingId(null);
@@ -161,6 +165,7 @@ const TimeRegistration = () => {
             editingId={editingId}
             cancelEdit={cancelEdit}
             clients={clients}
+            consultants={consultants}
             isSubmitting={isSubmitting}
           />
 

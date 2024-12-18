@@ -1,6 +1,5 @@
 import React from 'react';
-
-
+import PropTypes from 'prop-types'
 
 const RegistrationForm = ({
   currentEntry,
@@ -9,9 +8,10 @@ const RegistrationForm = ({
   editingId,
   cancelEdit,
   clients,
+  consultants,
   isSubmitting
 }) => {
-  const handleInputChange = (e) => {
+  const handleChange = (e) => {
     const { name, value } = e.target;
     setCurrentEntry(prev => ({
       ...prev,
@@ -34,7 +34,7 @@ const RegistrationForm = ({
             type="date"
             name="date"
             value={currentEntry.date}
-            onChange={handleInputChange}
+            onChange={handleChange}
             required
             className="w-full p-2 border rounded focus:ring-blue-500 focus:border-blue-500"
           />
@@ -44,15 +44,22 @@ const RegistrationForm = ({
           <label className="block text-sm font-medium text-gray-700 mb-1">
             Konsulent
           </label>
-          <input
-            type="text"
+          <select
             name="consultant"
             value={currentEntry.consultant}
-            onChange={handleInputChange}
+            onChange={handleChange}
             required
             className="w-full p-2 border rounded focus:ring-blue-500 focus:border-blue-500"
-          />
+          >
+            <option value="">Velg konsulent</option>
+            {(consultants || []).map((consultant) => (
+              <option key={consultant} value={consultant}>
+                {consultant}
+              </option>
+            ))}
+          </select>
         </div>
+
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -61,7 +68,7 @@ const RegistrationForm = ({
           <select
             name="client"
             value={currentEntry.client}
-            onChange={handleInputChange}
+            onChange={handleChange}
             required
             className="w-full p-2 border rounded focus:ring-blue-500 focus:border-blue-500"
           >
@@ -81,7 +88,7 @@ const RegistrationForm = ({
           <select
             name="project"
             value={currentEntry.project}
-            onChange={handleInputChange}
+            onChange={handleChange}
             className="w-full p-2 border rounded focus:ring-blue-500 focus:border-blue-500"
           >
             <option value="">Velg prosjekt</option>
@@ -101,7 +108,7 @@ const RegistrationForm = ({
             type="number"
             name="hours"
             value={currentEntry.hours}
-            onChange={handleInputChange}
+            onChange={handleChange}
             required
             step="0.25"
             min="0"
@@ -117,7 +124,7 @@ const RegistrationForm = ({
             type="number"
             name="travelHours"
             value={currentEntry.travelHours}
-            onChange={handleInputChange}
+            onChange={handleChange}
             step="0.25"
             min="0"
             className="w-full p-2 border rounded focus:ring-blue-500 focus:border-blue-500"
@@ -132,7 +139,7 @@ const RegistrationForm = ({
         <textarea
           name="description"
           value={currentEntry.description}
-          onChange={handleInputChange}
+          onChange={handleChange}
           required
           rows="3"
           className="w-full p-2 border rounded focus:ring-blue-500 focus:border-blue-500"
@@ -159,6 +166,17 @@ const RegistrationForm = ({
       </div>
     </form>
   );
+};
+
+RegistrationForm.propTypes = {
+  currentEntry: PropTypes.object.isRequired,
+  setCurrentEntry: PropTypes.func.isRequired,
+  handleSubmit: PropTypes.func.isRequired,
+  editingId: PropTypes.string,
+  cancelEdit: PropTypes.func.isRequired,
+  clients: PropTypes.object.isRequired,
+  consultants: PropTypes.array.isRequired,
+  isSubmitting: PropTypes.bool.isRequired
 };
 
 export default RegistrationForm;
