@@ -13,15 +13,24 @@ if (!supabaseUrl || !supabaseAnonKey) {
 
 // Time registration functions
 export const timeRegistrationService = {
-  async getAllEntries() {
-    const { data, error } = await supabase
-      .from('time_entries')
-      .select('*')
-      .order('date', { ascending: false })
+    async getAllEntries() {
+        const { data, error } = await supabase
+            .from('time_entries')
+            .select('*')
+            .order('date', { ascending: false });
+        
+        if (error) throw error;
+        
+        console.log("Hentede data fra Supabase:", data); // Sjekk ID-er og felt
+        
+        // Mapper travel_hours til travelHours for frontend
+        return data.map(entry => ({
+            ...entry,
+            id: entry.id, // Sørg for at ID-en beholdes
+            travelHours: entry.travel_hours
+        }));
+        },
     
-    if (error) throw error
-    return data
-  },
 
   async addEntry(entry) {
     const { data, error } = await supabase
@@ -31,7 +40,7 @@ export const timeRegistrationService = {
         client: entry.client,
         project: entry.project,
         hours: entry.hours,
-        travel_hours: entry.travelHours,
+        travel_hours: entry.travelHours === '' ? 0 : Number(entry.travelHours),
         description: entry.description,
         consultant: entry.consultant,
         timestamp: new Date().toISOString()
@@ -43,31 +52,64 @@ export const timeRegistrationService = {
 },
 
   async updateEntry(id, entry) {
+    console.log("Oppdaterer ID:", id, "med data:", entry); // Sjekk hva som sendes inn
+
+    const parsedId = parseInt(id, 10);
+
+    console.log("Oppdaterer entry med ID: ", parsedId, "og data ", entry);
+
     const { data, error } = await supabase
       .from('time_entries')
       .update({
         date: entry.date,
         client: entry.client,
         project: entry.project,
-        hours: entry.hours,
-        travel_hours: entry.travelHours,
+        hours: Number(entry.hours),
+        travel_hours: entry.travelHours === '' ? 0 : Number(entry.travelHours),
         description: entry.description,
         consultant: entry.consultant
       })
-      .eq('id', id)
+      .eq('id', parsedId) //bruk integer for ID      
       .select()
     
-    if (error) throw error
-    return data[0]
-  },
+      if (error) {
+        console.error('Feil ved oppdatering:', error.message);
+        throw error;
+      }
+      
+      console.log("Data som sendes til Supabase:", {
+        id: parseInt(id, 10), // Sørg for integer ID
+        date: entry.date,
+        client: entry.client,
+        project: entry.project,
+        hours: Number(entry.hours),
+        travel_hours: entry.travelHours === '' ? 0 : Number(entry.travelHours),
+        description: entry.description,
+        consultant: entry.consultant
+      });
+      
+
+      // Returner første oppdaterte rad
+      console.log("Oppdatering fullført: ", data);
+      return data[0];
+    },
 
   async deleteEntry(id) {
+    console.log("sletter ID:", id);  // Sjekk hva som sendes inn
     const { error } = await supabase
       .from('time_entries')
       .delete()
       .eq('id', id)
-    
-    if (error) throw error
+
+    if (error) {
+    console.error('Feil ved sletting:', error.message);
+    throw error;
+    }
+
+    if (count === 0) {
+    console.warn('Ingen rader ble slettet. Sjekk ID.');
+    throw new Error('Kunne ikke slette registrering. Prøv igjen.');
+    }
   }
 }
 

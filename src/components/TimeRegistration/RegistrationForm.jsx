@@ -13,6 +13,13 @@ const RegistrationForm = ({
 }) => {
   const handleChange = (e) => {
     const { name, value } = e.target;
+
+    // Sjekk at `name` og `value` er gyldige
+    if (!name) {
+      console.error("Navn mangler i event:", e);
+      return;
+    }
+
     setCurrentEntry(prev => ({
       ...prev,
       [name]: value
@@ -123,7 +130,7 @@ const RegistrationForm = ({
           <input
             type="number"
             name="travelHours"
-            value={currentEntry.travelHours}
+            value={currentEntry.travelHours || ''}
             onChange={handleChange}
             step="0.25"
             min="0"
@@ -172,7 +179,7 @@ RegistrationForm.propTypes = {
   currentEntry: PropTypes.object.isRequired,
   setCurrentEntry: PropTypes.func.isRequired,
   handleSubmit: PropTypes.func.isRequired,
-  editingId: PropTypes.string,
+  editingId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]), // Godta både string og number
   cancelEdit: PropTypes.func.isRequired,
   clients: PropTypes.object.isRequired,
   consultants: PropTypes.array.isRequired,
