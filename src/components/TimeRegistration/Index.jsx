@@ -22,7 +22,8 @@ const TimeRegistration = () => {
     consultant: ''
   });
 
-  const [editingId, setEditingId] = useState(null);
+  const [editingId, setEditingId] = useState('');
+
   const [filters, setFilters] = useState({
     dateFrom: '',
     dateTo: '',
@@ -71,86 +72,171 @@ const TimeRegistration = () => {
   // Navn på konsulenter
   const consultants = ['Hanne', 'Kathrine', 'Johannes'];
 
-
   // Form handlers
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsSubmitting(true);
-    
+
     try {
       let result;
       
       if (editingId) {
-        // Oppdater eksisterende registrering
-        result = await timeRegistrationService.updateEntry(editingId, currentEntry);
-        setTimeEntries(prev => prev.map(entry => 
-          entry.id === editingId ? result : entry
-        ));
+        console.log("Updating entry (delete and create new) for ID:", editingId);
+        
+        // Først slett den gamle oppføringen
+        try {
+          await timeRegistrationService.deleteEntry(editingId);
+          console.log("Successfully deleted old entry");
+        } catch (error) {
+          console.error("Failed to delete old entry:", error);
+          throw new Error("Kunne ikke slette gammel registrering");
+        }
+        
+        // Så legg til en ny oppføring
+        try {
+          result = await timeRegistrationService.addEntry(currentEntry);
+          console.log("Successfully created new entry:", result);
+        } catch (error) {
+          console.error("Failed to create new entry:", error);
+          throw new Error("Kunne ikke opprette ny registrering");
+        }
+
+        if (result) {
+          // Oppdater frontend state
+          setTimeEntries(prev => {
+            const filtered = prev.filter(entry => entry.id !== editingId);
+            return [...filtered, result];
+          });
+
+          // Behold datoen fra forrige registrering
+          const lastUsedDate = currentEntry.date;
+          
+          // Reset form, men behold datoen
+          setEditingId(null);
+          setCurrentEntry({
+            date: lastUsedDate,
+            client: '',
+            project: '',
+            hours: '',
+            travelHours: '',
+            description: '',
+            consultant: ''
+          });
+          
+          alert('Timer oppdatert!');
+        }
       } else {
         // Opprett ny registrering
+        console.log("Creating new entry with data:", currentEntry);
         result = await timeRegistrationService.addEntry(currentEntry);
-        setTimeEntries(prev => [...prev, result]);
+        console.log("Creation completed with result:", result);
+        
+        if (result) {
+          setTimeEntries(prev => [...prev, result]);
+          
+          // Behold datoen fra forrige registrering
+          const lastUsedDate = currentEntry.date;
+          
+          // Reset form, men behold datoen
+          setCurrentEntry({
+            date: lastUsedDate,
+            client: '',
+            project: '',
+            hours: '',
+            travelHours: '',
+            description: '',
+            consultant: ''
+          });
+          
+          alert('Timer registrert!');
+        }
       }
-
-      // Reset form
-      setCurrentEntry({
-        date: new Date().toISOString().split('T')[0],
-        client: '',
-        project: '',
-        hours: '',
-        travelHours: '',
-        description: '',
-        consultant: '' // Keep consultant
-      });
-      
-      setEditingId(null);
-      alert(editingId ? 'Timer oppdatert!' : 'Timer registrert!');
-      
     } catch (error) {
-      console.error('Feil ved registrering:', error);
-      alert(`Feil ved registrering: ${error.message}`);
+      console.error('Error in handleSubmit:', error);
+      alert(error.message || 'En feil oppstod ved registrering');
     } finally {
       setIsSubmitting(false);
     }
   };
 
   const handleDelete = async (id) => {
+    if (!id) {
+      console.error("Invalid ID for deletion:", id);
+      alert('Ugyldig ID for sletting');
+      return;
+    }
+
     if (window.confirm('Er du sikker på at du vil slette denne timeregistreringen?')) {
       try {
+        console.log("Starting delete operation for ID:", id);
+        
+        // Prøv å slette
         await timeRegistrationService.deleteEntry(id);
-        setTimeEntries(prev => prev.filter(entry => entry.id !== id));
+        console.log("Delete operation successful");
+        
+        // Hvis slettingen var vellykket, oppdater frontend
+        setTimeEntries(prev => {
+          const updated = prev.filter(entry => entry.id !== id);
+          console.log("Updated entries after deletion:", updated);
+          return updated;
+        });
+        
         alert('Timeregistrering slettet');
+        
+        // Hvis vi var i redigeringsmodus for denne oppføringen, avbryt redigeringen
+        if (editingId === id) {
+          setEditingId(null);
+          setCurrentEntry({
+            date: new Date().toISOString().split('T')[0],
+            client: '',
+            project: '',
+            hours: '',
+            travelHours: '',
+            description: '',
+            consultant: ''
+          });
+        }
       } catch (error) {
-        console.error('Feil ved sletting:', error);
-        alert(`Feil ved sletting: ${error.message}`);
+        console.error('Delete operation failed:', error);
+        alert(`Kunne ikke slette timeregistrering: ${error.message}`);
+        
+        // Hvis feilen indikerer at oppføringen ikke finnes, oppdater frontend uansett
+        if (error.message.includes('Fant ikke oppføringen')) {
+          setTimeEntries(prev => prev.filter(entry => entry.id !== id));
+        }
       }
     }
   };
 
   const handleEdit = (entry) => {
+    console.log("Starting edit with entry:", entry);
+    setEditingId(entry.id);
     setCurrentEntry({
       date: entry.date,
       client: entry.client,
-      project: entry.project || '',
+      project: entry.project,
       hours: entry.hours,
-      travelHours: entry.travel_hours || '',
+      travelHours: entry.travelHours || '',
       description: entry.description,
       consultant: entry.consultant
     });
-    setEditingId(entry.id);
+    // Scroll til toppen av siden
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const cancelEdit = () => {
+    // Behold datoen fra nåværende skjema
+    const currentDate = currentEntry.date;
+    
     setEditingId(null);
     setCurrentEntry({
-      date: new Date().toISOString().split('T')[0],
+      date: currentDate, // Beholder den nåværende datoen
       client: '',
       project: '',
       hours: '',
       travelHours: '',
       description: '',
-      consultant: currentEntry.consultant
+      consultant: ''
     });
   };
 
