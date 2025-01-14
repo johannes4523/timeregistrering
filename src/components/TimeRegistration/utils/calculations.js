@@ -6,6 +6,7 @@ export const calculateTotalHours = (entries) => {
 };
 
 export const calculateClientTotals = (entries) => {
+  console.log("Entries for total hours:", entries); // Sjekk hva som finnes i data
   return entries.reduce((acc, entry) => {
     const client = entry.client;
     if (!acc[client]) {

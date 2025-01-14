@@ -62,6 +62,7 @@ const TimeRegistration = () => {
 
   // Client configuration
   const clients = {
+    'Valori': ['Administrasjon'],
     'Valori - DigiRehab': [],
     'Valori - KMD': [],
     'Valori - Youwell': [],
