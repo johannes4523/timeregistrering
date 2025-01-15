@@ -67,7 +67,7 @@ const TimeRegistration = () => {
     'Valori - KMD': [],
     'Valori - Youwell': [],
     'Valori - EHiN': [],
-    'Valori Care': ['Funding', 'Markedsføring SoMe', 'Produktutvikling', 'Administrasjon', 'Annet', 'Forskningsmidler'],
+    'Valori Care': ['Administrasjon', 'Funding', 'Markedsføring SoMe', 'Produktutvikling', 'Dam stiftelsen', 'NFF Forskningsfond', 'Annet',],
   };
 
   // Navn på konsulenter
