@@ -67,6 +67,8 @@ const TimeRegistration = () => {
     'Valori - KMD': [],
     'Valori - Youwell': [],
     'Valori - EHiN': [],
+    'Valori - Rud Pedersen': [],
+    'Valori - DentaApps': [],
     'Valori Care': ['Administrasjon', 'Funding', 'Markedsføring SoMe', 'Produktutvikling', 'Dam stiftelsen', 'NFF Forskningsfond', 'Annet',],
   };
 
