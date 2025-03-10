@@ -69,6 +69,7 @@ const TimeRegistration = () => {
     'Valori - EHiN': [],
     'Valori - Rud Pedersen': [],
     'Valori - DentaApps': [],
+    'Valori - Noteless': [],
     'Valori Care': ['Administrasjon', 'Funding', 'Markedsføring SoMe', 'Produktutvikling', 'Dam stiftelsen', 'NFF Forskningsfond', 'Annet',],
   };
 
